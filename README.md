@@ -2,8 +2,6 @@
 
 This Turborepo starter is maintained by the Turborepo core team.
 
-## Using this example
-
 ## What's inside?
 
 This Turborepo includes the following packages/apps:
