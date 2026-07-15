@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   // Officers see all incidents per PRD (for spatial awareness)
   const incidents = await Incident.find(query)
-    .populate("locationId", "name geo")
+    .populate("locationId", "name city state country geo")
     .populate("officerId", "name badgeNumber")
     .sort({ date: -1 });
 
