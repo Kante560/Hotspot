@@ -59,7 +59,7 @@ export default function NewIncidentPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Report Incident</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Report Incident</h1>
         <p className="text-text-secondary mt-1">
           Record a new incident with its severity and location.
         </p>

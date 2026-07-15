@@ -95,8 +95,8 @@ export default function IncidentDetailsPage({ params }: { params: Promise<{ id: 
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-white">Incident Report</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Incident Report</h1>
             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${
               incident.status === "Open" ? "border-warning/50 text-warning bg-warning/10" :
               "border-success/50 text-success bg-success/10"

@@ -48,9 +48,9 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Incident Reports</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Incident Reports</h1>
           <p className="text-text-secondary mt-1">View and export all recorded incidents.</p>
         </div>
         <button

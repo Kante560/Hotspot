@@ -69,7 +69,7 @@ export default function OfficersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Manage Officers</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Manage Officers</h1>
         <p className="text-text-secondary mt-1">Register new officers and manage personnel access.</p>
       </div>
 

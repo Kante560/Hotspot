@@ -39,7 +39,7 @@ export default function MapPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Hotspot Analysis Map</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Hotspot Analysis Map</h1>
         <p className="text-text-secondary mt-1">Geospatial view of incident densities across Cross River State.</p>
       </div>
 

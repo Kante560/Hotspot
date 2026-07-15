@@ -121,9 +121,9 @@ export default function IncidentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Incidents</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Incidents</h1>
           <p className="text-text-secondary mt-1">Manage and track reported crimes.</p>
         </div>
         <Button
@@ -137,7 +137,7 @@ export default function IncidentsPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-1 items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-1">
           <div className="relative" ref={funnelRef}>
             <button
               type="button"
@@ -225,7 +225,7 @@ export default function IncidentsPage() {
             )}
           </div>
 
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <input
               type="text"

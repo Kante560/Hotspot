@@ -30,7 +30,7 @@ export default async function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Dashboard</h1>
         <p className="text-text-secondary mt-1">Overview of Crime Hotspot Data</p>
       </div>
 

@@ -40,7 +40,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="sticky top-0 flex h-screen shrink-0">
+    <div className="sticky top-0 hidden h-screen shrink-0 md:flex">
       <aside
         className={cn(
           "h-screen shrink-0 overflow-hidden border-r border-white/10 bg-background/80 backdrop-blur-md transition-[width] duration-300 ease-in-out",
