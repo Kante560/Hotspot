@@ -8,8 +8,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env from the root of apps/web
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env.local") });
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/crime-hotspot-mvp";
 
@@ -30,6 +29,26 @@ const locations = [
   { name: "Port Harcourt Waterfront", city: "Port Harcourt", state: "Rivers", country: "Nigeria", geo: { type: "Point", coordinates: [7.0134, 4.8156] } },
   // Nigeria — Kano
   { name: "Kano Sabon Gari", city: "Kano", state: "Kano", country: "Nigeria", geo: { type: "Point", coordinates: [8.5364, 12.0022] } },
+  // Additional Nigerian states
+  { name: "Kaduna Central", city: "Kaduna", state: "Kaduna", country: "Nigeria", geo: { type: "Point", coordinates: [7.4383, 10.5105] } },
+  { name: "Ibadan Ring Road", city: "Ibadan", state: "Oyo", country: "Nigeria", geo: { type: "Point", coordinates: [3.9470, 7.3775] } },
+  { name: "Enugu Independence Layout", city: "Enugu", state: "Enugu", country: "Nigeria", geo: { type: "Point", coordinates: [7.5139, 6.5244] } },
+  { name: "Onitsha Main Market", city: "Onitsha", state: "Anambra", country: "Nigeria", geo: { type: "Point", coordinates: [6.1500, 6.1667] } },
+  { name: "Benin City Ring Road", city: "Benin City", state: "Edo", country: "Nigeria", geo: { type: "Point", coordinates: [5.6037, 6.3350] } },
+  { name: "Warri Township", city: "Warri", state: "Delta", country: "Nigeria", geo: { type: "Point", coordinates: [5.7536, 5.5167] } },
+  { name: "Akure Central", city: "Akure", state: "Ondo", country: "Nigeria", geo: { type: "Point", coordinates: [5.1953, 7.2571] } },
+  { name: "Jos Terminus", city: "Jos", state: "Plateau", country: "Nigeria", geo: { type: "Point", coordinates: [8.8965, 9.8965] } },
+  { name: "Maiduguri Central", city: "Maiduguri", state: "Borno", country: "Nigeria", geo: { type: "Point", coordinates: [13.1500, 11.8333] } },
+  { name: "Sokoto Central Market", city: "Sokoto", state: "Sokoto", country: "Nigeria", geo: { type: "Point", coordinates: [5.2333, 13.0667] } },
+  { name: "Yola Town", city: "Yola", state: "Adamawa", country: "Nigeria", geo: { type: "Point", coordinates: [12.4634, 9.2035] } },
+  { name: "Owerri Municipal", city: "Owerri", state: "Imo", country: "Nigeria", geo: { type: "Point", coordinates: [7.0336, 5.4836] } },
+  { name: "Abeokuta Central", city: "Abeokuta", state: "Ogun", country: "Nigeria", geo: { type: "Point", coordinates: [3.3483, 7.1475] } },
+  { name: "Makurdi Wadata", city: "Makurdi", state: "Benue", country: "Nigeria", geo: { type: "Point", coordinates: [8.5364, 7.7322] } },
+  { name: "Bauchi Central", city: "Bauchi", state: "Bauchi", country: "Nigeria", geo: { type: "Point", coordinates: [9.8442, 10.3103] } },
+  { name: "Minna Central", city: "Minna", state: "Niger", country: "Nigeria", geo: { type: "Point", coordinates: [6.5569, 9.6139] } },
+  { name: "Osogbo Central", city: "Osogbo", state: "Osun", country: "Nigeria", geo: { type: "Point", coordinates: [4.5196, 7.7827] } },
+  { name: "Katsina Central", city: "Katsina", state: "Katsina", country: "Nigeria", geo: { type: "Point", coordinates: [7.6171, 12.9908] } },
+  { name: "Gombe Central", city: "Gombe", state: "Gombe", country: "Nigeria", geo: { type: "Point", coordinates: [11.1715, 10.2897] } },
   // Ghana — Greater Accra
   { name: "Osu Oxford Street", city: "Accra", state: "Greater Accra", country: "Ghana", geo: { type: "Point", coordinates: [-0.1770, 5.5571] } },
   { name: "Madina Market", city: "Accra", state: "Greater Accra", country: "Ghana", geo: { type: "Point", coordinates: [-0.1657, 5.6837] } },
@@ -79,7 +98,7 @@ function randomDateWithinDays(days: number): Date {
 
 async function seed() {
   try {
-    console.log("Connecting to MongoDB...", MONGODB_URI);
+    console.log("Connecting to MongoDB...");
     await mongoose.connect(MONGODB_URI);
     console.log("Connected.");
 
@@ -97,11 +116,26 @@ async function seed() {
     const officers = await Officer.find({});
     console.log(`Found ${officers.length} officers to assign incidents to.`);
 
-    console.log("Clearing existing incidents...");
-    await Incident.deleteMany({});
+    const existingIncidentCounts = await Incident.aggregate<{
+      _id: mongoose.Types.ObjectId;
+      incidentCount: number;
+    }>([
+      { $group: { _id: "$locationId", incidentCount: { $sum: 1 } } },
+    ]);
+    const incidentCountsByLocation = new Map(
+      existingIncidentCounts.map(({ _id, incidentCount }) => [
+        _id.toString(),
+        incidentCount,
+      ])
+    );
+    const locationsWithoutIncidents = locationDocs.filter(
+      (loc) => !incidentCountsByLocation.has(loc._id.toString())
+    );
 
-    console.log("Inserting mock incidents...");
-    const incidents = locationDocs.flatMap((loc) => {
+    console.log(
+      `Adding incidents to ${locationsWithoutIncidents.length} locations without existing incidents.`
+    );
+    const incidents = locationsWithoutIncidents.flatMap((loc) => {
       const count = 3 + Math.floor(Math.random() * 4); // 3-6 incidents per location
       return Array.from({ length: count }, () => ({
         locationId: loc._id,
@@ -112,9 +146,13 @@ async function seed() {
         status: pick(statuses),
       }));
     });
-    await Incident.insertMany(incidents);
+    if (incidents.length > 0) {
+      await Incident.insertMany(incidents);
+    }
 
-    console.log(`Seeding complete! ${locationDocs.length} locations, ${incidents.length} incidents.`);
+    console.log(
+      `Seeding complete! ${locationDocs.length} locations, ${incidents.length} new incidents.`
+    );
     process.exit(0);
   } catch (err) {
     console.error("Error seeding crimes:", err);

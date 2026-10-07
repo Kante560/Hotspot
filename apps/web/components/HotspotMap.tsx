@@ -42,7 +42,13 @@ function HeatmapLayer({ data }: { data: any[] }) {
   return null;
 }
 
-export default function HotspotMap({ hotspots }: { hotspots: any[] }) {
+export default function HotspotMap({
+  hotspots,
+  onReady,
+}: {
+  hotspots: any[];
+  onReady: () => void;
+}) {
   // Center roughly on Cross River State
   const center: [number, number] = [5.9, 8.5];
 
@@ -53,6 +59,7 @@ export default function HotspotMap({ hotspots }: { hotspots: any[] }) {
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          eventHandlers={{ load: onReady }}
         />
         
         <HeatmapLayer data={hotspots} />

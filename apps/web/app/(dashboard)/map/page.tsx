@@ -17,6 +17,7 @@ const HotspotMap = dynamic(() => import("../../../components/HotspotMap"), {
 export default function MapPage() {
   const [hotspots, setHotspots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -53,7 +54,21 @@ export default function MapPage() {
       {!error && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
-            <HotspotMap hotspots={hotspots} />
+            <div className="relative">
+              <HotspotMap hotspots={hotspots} onReady={() => setMapReady(true)} />
+              {(loading || !mapReady) && (
+                <div
+                  className="absolute inset-0 z-[1000] flex items-center justify-center rounded-xl border border-white/10 bg-background/80 backdrop-blur-sm"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="flex flex-col items-center gap-3 text-text-secondary">
+                    <Loader2 className="h-8 w-8 animate-spin text-brand-primary" />
+                    <span>Loading map...</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="space-y-4">
             <div className="rounded-xl border border-white/8 bg-white/4 p-6 backdrop-blur-md">

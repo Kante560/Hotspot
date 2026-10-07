@@ -6,6 +6,10 @@ import dbConnect from "../../../lib/db/mongoose";
 import { Incident } from "../../../lib/models/Incident";
 import { Officer } from "../../../lib/models/Officer";
 import "../../../lib/models/Location";
+import {
+  IncidentBreakdownChart,
+  type IncidentBreakdown,
+} from "../../../components/IncidentBreakdownChart";
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
@@ -26,6 +30,36 @@ export default async function Dashboard() {
     .populate("officerId", "name")
     .sort({ date: -1 })
     .limit(10);
+
+  const cityBreakdown = await Incident.aggregate<IncidentBreakdown>([
+    {
+      $lookup: {
+        from: "locations",
+        localField: "locationId",
+        foreignField: "_id",
+        as: "location",
+      },
+    },
+    { $unwind: "$location" },
+    { $group: { _id: "$location.city", incidentCount: { $sum: 1 } } },
+    { $sort: { incidentCount: -1, _id: 1 } },
+    { $limit: 8 },
+  ]);
+
+  const stateBreakdown = await Incident.aggregate<IncidentBreakdown>([
+    {
+      $lookup: {
+        from: "locations",
+        localField: "locationId",
+        foreignField: "_id",
+        as: "location",
+      },
+    },
+    { $unwind: "$location" },
+    { $group: { _id: "$location.state", incidentCount: { $sum: 1 } } },
+    { $sort: { incidentCount: -1, _id: 1 } },
+    { $limit: 12 },
+  ]);
 
   return (
     <div className="space-y-6">
@@ -60,6 +94,11 @@ export default async function Dashboard() {
             <p className="mt-2 text-3xl font-bold text-white">{officerCount}</p>
           </div>
         )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <IncidentBreakdownChart title="Incidents by City" breakdown={cityBreakdown} />
+        <IncidentBreakdownChart title="Incidents by State" breakdown={stateBreakdown} />
       </div>
 
       <div className="rounded-xl border border-white/8 bg-white/4 backdrop-blur-md overflow-hidden">
