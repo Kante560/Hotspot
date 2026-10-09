@@ -55,10 +55,10 @@ export default function HotspotMap({
   return (
     <div className="h-[600px] w-full rounded-xl overflow-hidden border border-white/10 shadow-2xl">
       <MapContainer center={center} zoom={7} className="h-full w-full" scrollWheelZoom={false}>
-        {/* CartoDB Dark Matter Tiles for the premium dark theme */}
+        {/* OpenStreetMap raster tiles do not require an API key. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           eventHandlers={{ load: onReady }}
         />
         
