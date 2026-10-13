@@ -6,7 +6,10 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import LocationSearch, { type PickedLocation } from "@/components/LocationSearch";
+import {
+  IncidentLocationPicker,
+  type IncidentLocation,
+} from "@/components/IncidentLocationPicker";
 
 const SEVERITIES = [
   { value: "Low", label: "Low", color: "success" },
@@ -18,7 +21,7 @@ export default function NewIncidentPage() {
   const router = useRouter();
   const [description, setDescription] = useState("");
   const [severity, setSeverity] = useState<"Low" | "Medium" | "High" | null>(null);
-  const [location, setLocation] = useState<PickedLocation | null>(null);
+  const [location, setLocation] = useState<IncidentLocation | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,9 +41,7 @@ export default function NewIncidentPage() {
         body: JSON.stringify({
           description,
           severity,
-          lat: location!.lat,
-          lng: location!.lng,
-          locationName: location!.name,
+          locationId: location!.id,
         }),
       });
 
@@ -50,8 +51,8 @@ export default function NewIncidentPage() {
       }
 
       router.push("/incidents");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to report incident");
       setSubmitting(false);
     }
   };
@@ -118,8 +119,10 @@ export default function NewIncidentPage() {
 
           <div className="space-y-2">
             <Label className="text-white">Location</Label>
-            <p className="text-xs text-text-muted">Search for the incident location by name.</p>
-            <LocationSearch value={location} onChange={setLocation} />
+            <p className="text-xs text-text-muted">
+              Allow device location to find nearby reporting locations.
+            </p>
+            <IncidentLocationPicker value={location} onChange={setLocation} />
           </div>
         </div>
 
