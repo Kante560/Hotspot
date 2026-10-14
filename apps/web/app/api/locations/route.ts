@@ -8,7 +8,22 @@ export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const state = req.nextUrl.searchParams.get("state");
+
   await dbConnect();
-  const locations = await Location.find({}).sort({ name: 1 });
-  return NextResponse.json(locations);
+  const query = state ? { state } : {};
+  const locations = await Location.find(query)
+    .sort({ state: 1, city: 1, name: 1 })
+    .lean();
+
+  return NextResponse.json(
+    locations.map((location) => ({
+      id: location._id.toString(),
+      name: location.name,
+      city: location.city,
+      state: location.state,
+      lat: location.geo.coordinates[1],
+      lng: location.geo.coordinates[0],
+    }))
+  );
 }

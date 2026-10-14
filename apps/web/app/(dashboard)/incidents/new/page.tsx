@@ -120,7 +120,7 @@ export default function NewIncidentPage() {
           <div className="space-y-2">
             <Label className="text-white">Location</Label>
             <p className="text-xs text-text-muted">
-              Allow device location to find nearby reporting locations.
+              Select your state, then choose the area where the incident happened.
             </p>
             <IncidentLocationPicker value={location} onChange={setLocation} />
           </div>

@@ -1,20 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Loader2, MapPin } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export type IncidentLocation = {
   id: string;
   name: string;
   city: string;
   state: string;
-};
-
-type DevicePosition = {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
+  lat?: number;
+  lng?: number;
 };
 
 export function IncidentLocationPicker({
@@ -24,162 +19,175 @@ export function IncidentLocationPicker({
   value: IncidentLocation | null;
   onChange: (location: IncidentLocation | null) => void;
 }) {
-  const [position, setPosition] = useState<DevicePosition | null>(null);
-  const [locations, setLocations] = useState<IncidentLocation[]>([]);
+  const [states, setStates] = useState<string[]>([]);
+  const [areas, setAreas] = useState<IncidentLocation[]>([]);
   const [selectedState, setSelectedState] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [locating, setLocating] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(true);
+  const [loadingAreas, setLoadingAreas] = useState(false);
   const [error, setError] = useState("");
 
-  const states = useMemo(
-    () => [...new Set(locations.map((location) => location.state))].sort(),
-    [locations]
-  );
-  const cities = useMemo(
-    () =>
-      [
-        ...new Set(
-          locations
-            .filter((location) => location.state === selectedState)
-            .map((location) => location.city)
-        ),
-      ].sort(),
-    [locations, selectedState]
-  );
-  const reportingLocations = useMemo(
-    () =>
-      locations.filter(
-        (location) =>
-          location.state === selectedState && location.city === selectedCity
-      ),
-    [locations, selectedCity, selectedState]
-  );
+  // Load the list of states once on mount
+  useEffect(() => {
+    let cancelled = false;
 
-  const chooseState = (state: string) => {
-    setSelectedState(state);
-    const firstCity = locations.find((location) => location.state === state)?.city ?? "";
-    setSelectedCity(firstCity);
-    onChange(
-      locations.find(
-        (location) => location.state === state && location.city === firstCity
-      ) ?? null
-    );
-  };
-
-  const chooseCity = (city: string) => {
-    setSelectedCity(city);
-    onChange(
-      locations.find(
-        (location) => location.state === selectedState && location.city === city
-      ) ?? null
-    );
-  };
-
-  const locateDevice = () => {
-    if (!navigator.geolocation) {
-      setError("This browser does not support device location.");
-      return;
-    }
-
-    setError("");
-    setLocating(true);
-    onChange(null);
-
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        const devicePosition = {
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: coords.accuracy,
-        };
-        setPosition(devicePosition);
-
-        try {
-          const params = new URLSearchParams({
-            lat: String(coords.latitude),
-            lng: String(coords.longitude),
-          });
-          const response = await fetch(`/api/locations/nearby?${params}`);
-          const result: unknown = await response.json();
-          if (!response.ok) {
-            const message =
-              typeof result === "object" &&
+    (async () => {
+      try {
+        const response = await fetch("/api/locations/states");
+        const result: unknown = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof result === "object" &&
               result !== null &&
               "error" in result &&
               typeof result.error === "string"
-                ? result.error
-                : "Could not find nearby reporting locations.";
-            throw new Error(message);
-          }
+              ? result.error
+              : "Could not load states."
+          );
+        }
+        if (!cancelled) setStates(result as string[]);
+      } catch (cause) {
+        if (!cancelled) {
+          setError(
+            cause instanceof Error ? cause.message : "Could not load states."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingStates(false);
+      }
+    })();
 
-          const nearbyLocations = result as IncidentLocation[];
-          setLocations(nearbyLocations);
-          if (nearbyLocations.length === 0) {
-            setSelectedState("");
-            setSelectedCity("");
-            setError("No seeded reporting locations were found within 100 km.");
-            return;
-          }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-          const nearest = nearbyLocations[0]!;
-          setSelectedState(nearest.state);
-          setSelectedCity(nearest.city);
-          onChange(nearest);
-        } catch (cause) {
-          setLocations([]);
-          setSelectedState("");
-          setSelectedCity("");
+  // When a state is chosen, load the seeded areas (lat/lng locations) for it
+  useEffect(() => {
+    if (!selectedState) {
+      setAreas([]);
+      onChange(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingAreas(true);
+    setError("");
+    onChange(null);
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({ state: selectedState });
+        const response = await fetch(`/api/locations?${params}`);
+        const result: unknown = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            typeof result === "object" &&
+              result !== null &&
+              "error" in result &&
+              typeof result.error === "string"
+              ? result.error
+              : "Could not load locations for this state."
+          );
+        }
+
+        if (!cancelled) {
+          const stateAreas = result as IncidentLocation[];
+          setAreas(stateAreas);
+          // Pre-select the first area so a location is always indexed
+          if (stateAreas.length > 0) {
+            onChange(stateAreas[0]!);
+          } else {
+            setError("No seeded reporting locations were found for this state.");
+          }
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          setAreas([]);
           setError(
             cause instanceof Error
               ? cause.message
-              : "Could not find nearby reporting locations."
+              : "Could not load locations for this state."
           );
-        } finally {
-          setLocating(false);
         }
-      },
-      (geolocationError) => {
-        const messages: Record<number, string> = {
-          1: "Location permission was denied. Allow location access in your browser settings, then try again.",
-          2: "Your device could not determine its location. Check that location services are enabled, then try again.",
-          3: "The location request timed out. Please try again.",
-        };
-        setError(
-          messages[geolocationError.code] ??
-            "Could not get your device location. Please try again."
-        );
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
-    );
-  };
+      } finally {
+        if (!cancelled) setLoadingAreas(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedState]);
 
   return (
     <div className="space-y-3">
-      <Button
-        type="button"
-        variant="outline"
-        onClick={locateDevice}
-        disabled={locating}
-        className="h-auto w-full justify-center gap-2 px-4 py-2.5"
-      >
-        {locating ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <MapPin className="h-4 w-4" />
-        )}
-        {locating
-          ? "Getting your location..."
-          : position
-            ? "Refresh current location"
-            : "Get current location"}
-      </Button>
+      {/* Indexed state: kept behind the scenes and used to look up the areas */}
+      <input type="hidden" name="state" value={selectedState} />
 
-      {position && (
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1.5 text-sm text-text-secondary">
+          State
+          <select
+            value={selectedState}
+            onChange={(event) => setSelectedState(event.target.value)}
+            disabled={loadingStates}
+            className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
+          >
+            <option value="" className="bg-bg-surface">
+              {loadingStates ? "Loading states..." : "Select a state"}
+            </option>
+            {states.map((state) => (
+              <option key={state} value={state} className="bg-bg-surface">
+                {state}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1.5 text-sm text-text-secondary">
+          Area
+          <select
+            value={value?.id ?? ""}
+            onChange={(event) =>
+              onChange(
+                areas.find((area) => area.id === event.target.value) ?? null
+              )
+            }
+            disabled={!selectedState || loadingAreas || areas.length === 0}
+            className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary disabled:opacity-60"
+          >
+            <option value="" className="bg-bg-surface">
+              {loadingAreas
+                ? "Loading areas..."
+                : !selectedState
+                  ? "Select a state first"
+                  : areas.length === 0
+                    ? "No areas available"
+                    : "Select an area"}
+            </option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id} className="bg-bg-surface">
+                {area.name} ({area.city})
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {loadingAreas && (
+        <p className="flex items-center gap-2 text-xs text-text-muted" role="status">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Loading locations for {selectedState}...
+        </p>
+      )}
+
+      {!loadingAreas && value && (
         <p className="text-xs text-text-muted" role="status">
-          Device location: {position.latitude.toFixed(5)},{" "}
-          {position.longitude.toFixed(5)} (accuracy approximately{" "}
-          {Math.round(position.accuracy)} m)
+          Indexed location: {value.name}, {value.city}, {value.state}
+          {typeof value.lat === "number" && typeof value.lng === "number"
+            ? ` (${value.lat.toFixed(4)}, ${value.lng.toFixed(4)})`
+            : ""}
         </p>
       )}
 
@@ -187,65 +195,6 @@ export function IncidentLocationPicker({
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
-      )}
-
-      {locations.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="space-y-1.5 text-sm text-text-secondary">
-            State
-            <select
-              value={selectedState}
-              onChange={(event) => chooseState(event.target.value)}
-              className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            >
-              {states.map((state) => (
-                <option key={state} value={state} className="bg-bg-surface">
-                  {state}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="space-y-1.5 text-sm text-text-secondary">
-            City
-            <select
-              value={selectedCity}
-              onChange={(event) => chooseCity(event.target.value)}
-              className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            >
-              {cities.map((city) => (
-                <option key={city} value={city} className="bg-bg-surface">
-                  {city}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="space-y-1.5 text-sm text-text-secondary">
-            Reporting location
-            <select
-              value={value?.id ?? ""}
-              onChange={(event) =>
-                onChange(
-                  reportingLocations.find(
-                    (location) => location.id === event.target.value
-                  ) ?? null
-                )
-              }
-              className="w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-white focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
-            >
-              {reportingLocations.map((location) => (
-                <option
-                  key={location.id}
-                  value={location.id}
-                  className="bg-bg-surface"
-                >
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
       )}
     </div>
   );

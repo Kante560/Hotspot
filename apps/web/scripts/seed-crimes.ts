@@ -102,6 +102,30 @@ async function seed() {
     await mongoose.connect(MONGODB_URI);
     console.log("Connected.");
 
+    // Remove incidents whose location no longer exists (e.g. after a location
+    // reseed). These are invisible on the hotspot map because the aggregation
+    // $unwinds the $lookup result, silently dropping rows with no location.
+    const orphanedIncidents = await Incident.aggregate<{ _id: mongoose.Types.ObjectId }>([
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location",
+        },
+      },
+      { $match: { location: { $size: 0 } } },
+      { $project: { _id: 1 } },
+    ]);
+    if (orphanedIncidents.length > 0) {
+      await Incident.deleteMany({
+        _id: { $in: orphanedIncidents.map(({ _id }) => _id) },
+      });
+      console.log(
+        `Removed ${orphanedIncidents.length} orphaned incidents (missing locations).`
+      );
+    }
+
     console.log("Upserting locations across states and countries...");
     const locationDocs = [];
     for (const loc of locations) {
