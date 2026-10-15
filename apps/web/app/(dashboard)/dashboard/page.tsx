@@ -31,7 +31,7 @@ export default async function Dashboard() {
     .sort({ date: -1 })
     .limit(10);
 
-  const cityBreakdown = await Incident.aggregate<IncidentBreakdown>([
+  let cityBreakdown = await Incident.aggregate<IncidentBreakdown>([
     {
       $lookup: {
         from: "locations",
@@ -41,10 +41,44 @@ export default async function Dashboard() {
       },
     },
     { $unwind: "$location" },
+    {
+      $match: {
+        "location.country": "Nigeria",
+        "location.city": { $nin: ["Lagos", "Abuja"] },
+      },
+    },
     { $group: { _id: "$location.city", incidentCount: { $sum: 1 } } },
     { $sort: { incidentCount: -1, _id: 1 } },
     { $limit: 8 },
   ]);
+
+  const hasCalabar = cityBreakdown.some((item) => item._id === "Calabar");
+  if (!hasCalabar) {
+    const calabarAgg = await Incident.aggregate<IncidentBreakdown>([
+      {
+        $lookup: {
+          from: "locations",
+          localField: "locationId",
+          foreignField: "_id",
+          as: "location",
+        },
+      },
+      { $unwind: "$location" },
+      {
+        $match: {
+          "location.country": "Nigeria",
+          "location.city": "Calabar",
+        },
+      },
+      { $group: { _id: "$location.city", incidentCount: { $sum: 1 } } },
+    ]);
+    const firstCalabar = calabarAgg[0];
+    if (firstCalabar && firstCalabar.incidentCount > 0) {
+      cityBreakdown = [...cityBreakdown.slice(0, 7), firstCalabar].sort(
+        (a, b) => b.incidentCount - a.incidentCount
+      );
+    }
+  }
 
   const stateBreakdown = await Incident.aggregate<IncidentBreakdown>([
     {
@@ -56,7 +90,23 @@ export default async function Dashboard() {
       },
     },
     { $unwind: "$location" },
-    { $group: { _id: "$location.state", incidentCount: { $sum: 1 } } },
+    {
+      $match: {
+        "location.country": "Nigeria",
+      },
+    },
+    {
+      $project: {
+        state: {
+          $cond: [
+            { $eq: ["$location.state", "FCT"] },
+            "Abuja",
+            "$location.state",
+          ],
+        },
+      },
+    },
+    { $group: { _id: "$state", incidentCount: { $sum: 1 } } },
     { $sort: { incidentCount: -1, _id: 1 } },
     { $limit: 12 },
   ]);

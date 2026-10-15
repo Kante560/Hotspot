@@ -16,15 +16,15 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/crime-
 const locations = [
   // Nigeria — Cross River
   { name: "Calabar Municipal", city: "Calabar", state: "Cross River", country: "Nigeria", geo: { type: "Point", coordinates: [8.3286, 4.9583] } },
+  { name: "Calabar South", city: "Calabar", state: "Cross River", country: "Nigeria", geo: { type: "Point", coordinates: [8.3167, 4.9333] } },
   { name: "Ikom Urban", city: "Ikom", state: "Cross River", country: "Nigeria", geo: { type: "Point", coordinates: [8.7167, 5.9667] } },
   { name: "Ogoja Main", city: "Ogoja", state: "Cross River", country: "Nigeria", geo: { type: "Point", coordinates: [8.7969, 6.6598] } },
   // Nigeria — Lagos
   { name: "Ikeja GRA", city: "Ikeja", state: "Lagos", country: "Nigeria", geo: { type: "Point", coordinates: [3.3515, 6.6018] } },
-  { name: "Victoria Island", city: "Lagos", state: "Lagos", country: "Nigeria", geo: { type: "Point", coordinates: [3.4219, 6.4281] } },
   { name: "Surulere Stadium Area", city: "Surulere", state: "Lagos", country: "Nigeria", geo: { type: "Point", coordinates: [3.3554, 6.5005] } },
-  // Nigeria — FCT
-  { name: "Wuse Market", city: "Abuja", state: "FCT", country: "Nigeria", geo: { type: "Point", coordinates: [7.4635, 9.0765] } },
-  { name: "Garki Area 11", city: "Abuja", state: "FCT", country: "Nigeria", geo: { type: "Point", coordinates: [7.4913, 9.0338] } },
+  // Nigeria — Abuja
+  { name: "Wuse Market", city: "Wuse", state: "Abuja", country: "Nigeria", geo: { type: "Point", coordinates: [7.4635, 9.0765] } },
+  { name: "Garki Area 11", city: "Garki", state: "Abuja", country: "Nigeria", geo: { type: "Point", coordinates: [7.4913, 9.0338] } },
   // Nigeria — Rivers
   { name: "Port Harcourt Waterfront", city: "Port Harcourt", state: "Rivers", country: "Nigeria", geo: { type: "Point", coordinates: [7.0134, 4.8156] } },
   // Nigeria — Kano
@@ -49,19 +49,6 @@ const locations = [
   { name: "Osogbo Central", city: "Osogbo", state: "Osun", country: "Nigeria", geo: { type: "Point", coordinates: [4.5196, 7.7827] } },
   { name: "Katsina Central", city: "Katsina", state: "Katsina", country: "Nigeria", geo: { type: "Point", coordinates: [7.6171, 12.9908] } },
   { name: "Gombe Central", city: "Gombe", state: "Gombe", country: "Nigeria", geo: { type: "Point", coordinates: [11.1715, 10.2897] } },
-  // Ghana — Greater Accra
-  { name: "Osu Oxford Street", city: "Accra", state: "Greater Accra", country: "Ghana", geo: { type: "Point", coordinates: [-0.1770, 5.5571] } },
-  { name: "Madina Market", city: "Accra", state: "Greater Accra", country: "Ghana", geo: { type: "Point", coordinates: [-0.1657, 5.6837] } },
-  // Kenya — Nairobi
-  { name: "Nairobi CBD", city: "Nairobi", state: "Nairobi County", country: "Kenya", geo: { type: "Point", coordinates: [36.8219, -1.2921] } },
-  // South Africa — Gauteng
-  { name: "Johannesburg Hillbrow", city: "Johannesburg", state: "Gauteng", country: "South Africa", geo: { type: "Point", coordinates: [28.0473, -26.1877] } },
-  // United Kingdom — Greater London
-  { name: "Camden High Street", city: "London", state: "Greater London", country: "United Kingdom", geo: { type: "Point", coordinates: [-0.1426, 51.5390] } },
-  // United States — New York
-  { name: "Brooklyn Downtown", city: "New York", state: "New York", country: "United States", geo: { type: "Point", coordinates: [-73.9857, 40.6928] } },
-  // United States — California
-  { name: "LA Skid Row", city: "Los Angeles", state: "California", country: "United States", geo: { type: "Point", coordinates: [-118.2437, 34.0407] } },
 ];
 
 const crimeDescriptions = [
@@ -126,7 +113,23 @@ async function seed() {
       );
     }
 
-    console.log("Upserting locations across states and countries...");
+    // Clean up foreign locations and incidents, and any location with city "Lagos"
+    const foreignOrLagosLocs = await Location.find({
+      $or: [
+        { country: { $ne: "Nigeria" } },
+        { city: "Lagos" },
+      ],
+    });
+    if (foreignOrLagosLocs.length > 0) {
+      const ids = foreignOrLagosLocs.map((l) => l._id);
+      await Incident.deleteMany({ locationId: { $in: ids } });
+      await Location.deleteMany({ _id: { $in: ids } });
+      console.log(
+        `Removed ${foreignOrLagosLocs.length} non-Nigeria or Lagos-city locations and their incidents.`
+      );
+    }
+
+    console.log("Upserting locations across states...");
     const locationDocs = [];
     for (const loc of locations) {
       const doc = await Location.findOneAndUpdate(
@@ -152,6 +155,8 @@ async function seed() {
         incidentCount,
       ])
     );
+
+    // Locations without incidents
     const locationsWithoutIncidents = locationDocs.filter(
       (loc) => !incidentCountsByLocation.has(loc._id.toString())
     );
@@ -160,7 +165,7 @@ async function seed() {
       `Adding incidents to ${locationsWithoutIncidents.length} locations without existing incidents.`
     );
     const incidents = locationsWithoutIncidents.flatMap((loc) => {
-      const count = 3 + Math.floor(Math.random() * 4); // 3-6 incidents per location
+      const count = loc.city === "Calabar" ? 6 : 3 + Math.floor(Math.random() * 4); // 3-6 incidents per location, 6 for Calabar
       return Array.from({ length: count }, () => ({
         locationId: loc._id,
         officerId: officers.length > 0 && Math.random() > 0.3 ? pick(officers)._id : undefined,
@@ -170,6 +175,26 @@ async function seed() {
         status: pick(statuses),
       }));
     });
+
+    // Ensure existing Calabar locations also have at least 6 incidents each
+    const calabarLocations = locationDocs.filter((loc) => loc.city === "Calabar");
+    for (const calLoc of calabarLocations) {
+      const currentCount = incidentCountsByLocation.get(calLoc._id.toString()) || 0;
+      if (currentCount < 6) {
+        const needed = 6 - currentCount;
+        for (let i = 0; i < needed; i++) {
+          incidents.push({
+            locationId: calLoc._id,
+            officerId: officers.length > 0 && Math.random() > 0.3 ? pick(officers)._id : undefined,
+            date: randomDateWithinDays(90),
+            description: pick(crimeDescriptions),
+            severity: pick(severities),
+            status: pick(statuses),
+          });
+        }
+      }
+    }
+
     if (incidents.length > 0) {
       await Incident.insertMany(incidents);
     }
